@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Get ToDos</title>
+</head>
+<body>
+    <h1>All ToDos</h1>
+    <button onclick="loadTodos()">Refresh</button>
+    <pre id="todos"></pre>
+    <script>
+        async function loadTodos() {
+            const res = await fetch('/get');
+            document.getElementById('todos').textContent = await res.text();
+        }
+        loadTodos();
+    </script>
+</body>
+</html>

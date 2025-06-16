@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Update ToDo</title>
+</head>
+<body>
+    <h1>Update ToDo</h1>
+    <form id="updateForm">
+        <input type="number" id="id" placeholder="ID" required>
+        <input type="text" id="desc" placeholder="New Description">
+        <input type="text" id="status" placeholder="New Status">
+        <button type="submit">Update</button>
+    </form>
+    <pre id="result"></pre>
+    <script>
+        document.getElementById('updateForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const id = parseInt(document.getElementById('id').value, 10);
+            const desc = document.getElementById('desc').value;
+            const status = document.getElementById('status').value;
+            const res = await fetch('/update', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({id, description: desc, status: status})
+            });
+            document.getElementById('result').textContent = await res.text();
+        };
+    </script>
+</body>
+</html>

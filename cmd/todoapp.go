@@ -4,8 +4,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"html/template"
 	"log/slog"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 	"todoapp/internal/store"
 
 	"github.com/google/uuid"
@@ -19,6 +24,7 @@ func main() {
 	updateText := flag.String("update-text", "", "the new description for the item")
 	updateStatus := flag.String("update-status", "", "the new status for the item (not started, started, completed)")
 	deleteID := flag.Int("delete-id", 0, "the ID of the item you want to delete")
+	serveAPI := flag.Bool("start-server", false, "Start HTTP API server")
 	flag.Parse()
 
 	traceID := uuid.NewString()
@@ -65,6 +71,82 @@ func main() {
 		}
 		fmt.Printf("Deleted item %d\n", *deleteID)
 
+	case *serveAPI:
+		api := &store.API{Items: &items}
+		mux := http.NewServeMux()
+
+		mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+
+		mux.HandleFunc("/create", api.Create)
+		mux.HandleFunc("/get", api.Get)
+		mux.HandleFunc("/update", api.Update)
+		mux.HandleFunc("/delete", api.Delete)
+
+		mux.HandleFunc("/list", func(w http.ResponseWriter, r *http.Request) {
+			tmpl := template.Must(template.New("list").Parse(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <title>ToDo List</title>
+            <style>
+                body { font-family: Arial, sans-serif; background: #f7f7f7; }
+                .container { max-width: 600px; margin: 40px auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 32px; }
+                h1 { color: #3498db; }
+                ul { padding-left: 1.2em; }
+                li { margin-bottom: 0.5em; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>ToDo List</h1>
+                <ul>
+                    {{range .}}
+                        <li>
+                            <strong>[{{.ID}}]</strong> {{.Description}} 
+                            <em>(Status: {{.Status}}, Created: {{.CreatedAt.Format "2006-01-02 15:04"}})</em>
+                        </li>
+                    {{else}}
+                        <li>No items found.</li>
+                    {{end}}
+                </ul>
+            </div>
+        </body>
+        </html>
+    `))
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			if err := tmpl.Execute(w, items); err != nil {
+				http.Error(w, "Template error", http.StatusInternalServerError)
+			}
+		})
+
+		server := &http.Server{Addr: ":8080", Handler: mux}
+
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+		go func() {
+			slog.Info("Starting HTTP server on :8080", "traceID", traceID)
+			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				slog.Error("HTTP server error", "error", err, "traceID", traceID)
+				os.Exit(1)
+			}
+		}()
+
+		<-sigChan // Wait for Ctrl+C
+
+		slog.Info("Interrupt received, shutting down server and saving items...")
+		ctxTimeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := server.Shutdown(ctxTimeout); err != nil {
+			slog.Error("Server shutdown error", "error", err)
+		}
+		if err := store.SaveItems(ctx, *filePath, items); err != nil {
+			slog.Error("Failed to save items on interrupt", "error", err)
+		} else {
+			slog.Info("Items saved successfully on interrupt")
+		}
+		os.Exit(0)
 	default:
 		// No Need to do anything, just print the current list
 	}
@@ -73,9 +155,18 @@ func main() {
 	store.PrintItems(ctx, store.ListItems(items))
 
 	// Save the (possibly modified) list back to disk
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	// Run a goroutine to handle graceful shutdown
+	<-sigChan
+	slog.Info("Interrupt received, saving items before exit...")
 	if err := store.SaveItems(ctx, *filePath, items); err != nil {
-		slog.Error("Failed to save items", "file", *filePath, "error", err)
-		os.Exit(1)
+		slog.Error("Failed to save items on interrupt", "error", err)
+	} else {
+		slog.Info("Items saved successfully on interrupt")
 	}
+	os.Exit(0)
+
 	slog.Info("Saved items to disk", "file", *filePath, "count", len(items))
 }
