@@ -154,19 +154,5 @@ func main() {
 	// Print the (possibly updated) to-do list
 	store.PrintItems(ctx, store.ListItems(items))
 
-	// Save the (possibly modified) list back to disk
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-
-	// Run a goroutine to handle graceful shutdown
-	<-sigChan
-	slog.Info("Interrupt received, saving items before exit...")
-	if err := store.SaveItems(ctx, *filePath, items); err != nil {
-		slog.Error("Failed to save items on interrupt", "error", err)
-	} else {
-		slog.Info("Items saved successfully on interrupt")
-	}
-	os.Exit(0)
-
 	slog.Info("Saved items to disk", "file", *filePath, "count", len(items))
 }
