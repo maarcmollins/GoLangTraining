@@ -7,13 +7,35 @@
 <body>
     <h1>Update ToDo</h1>
     <form id="updateForm">
-        <input type="number" id="id" placeholder="ID" required>
+        <select id="id" required>
+            <option value="">-- Select ID --</option>
+        </select>
         <input type="text" id="desc" placeholder="New Description">
-        <input type="text" id="status" placeholder="New Status">
+        <select id="status">
+            <option value="">-- Select Status --</option>
+            <option value="not started">Not Started</option>
+            <option value="started">Started</option>
+            <option value="completed">Completed</option>
+        </select>
         <button type="submit">Update</button>
     </form>
     <pre id="result"></pre>
     <script>
+        // Fetch all items and populate the dropdown
+        async function populateIDs() {
+            const res = await fetch('/get');
+            if (!res.ok) return;
+            const items = await res.json();
+            const select = document.getElementById('id');
+            items.forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item.id;
+                opt.textContent = `[${item.id}] ${item.description}`;
+                select.appendChild(opt);
+            });
+        }
+        populateIDs();
+
         document.getElementById('updateForm').onsubmit = async function(e) {
             e.preventDefault();
             const id = parseInt(document.getElementById('id').value, 10);

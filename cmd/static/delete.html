@@ -7,21 +7,43 @@
 <body>
     <h1>Delete ToDo</h1>
     <form id="deleteForm">
-        <input type="number" id="id" placeholder="ID" required>
+        <select id="id" required>
+            <option value="">-- Select ID --</option>
+        </select>
         <button type="submit">Delete</button>
     </form>
     <pre id="result"></pre>
     <script>
-        document.getElementById('deleteForm').onsubmit = async function(e) {
-            e.preventDefault();
-            const id = parseInt(document.getElementById('id').value, 10);
-            const res = await fetch('/delete', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({id})
-            });
-            document.getElementById('result').textContent = res.ok ? "Deleted!" : await res.text();
-        };
-    </script>
+    // Fetch all items and populate the dropdown
+    async function populateIDs() {
+        const res = await fetch('/get');
+        if (!res.ok) return;
+        const items = await res.json();
+        const select = document.getElementById('id');
+        items.forEach(item => {
+            const opt = document.createElement('option');
+            opt.value = item.id;
+            opt.textContent = `[${item.id}] ${item.description}`;
+            select.appendChild(opt);
+        });
+    }
+    populateIDs();
+
+    document.getElementById('deleteForm').onsubmit = async function(e) {
+        e.preventDefault();
+        const id = parseInt(document.getElementById('id').value, 10);
+        if (!id) return;
+        const res = await fetch('/delete', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({id})
+        });
+        document.getElementById('result').textContent = res.ok ? "Deleted!" : await res.text();
+        // Optionally remove the deleted option from the dropdown
+        if (res.ok) {
+            document.getElementById('id').querySelector(`option[value="${id}"]`).remove();
+        }
+    };
+</script>
 </body>
 </html>
