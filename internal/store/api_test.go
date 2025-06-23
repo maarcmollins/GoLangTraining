@@ -2,18 +2,23 @@ package store
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
 
+func testCtx() context.Context {
+	return context.WithValue(context.Background(), TraceIDKey, "test-trace-id")
+}
+
 func TestAPI_Create(t *testing.T) {
-	items := []Item{}
-	api := &API{Items: &items}
+	actor := NewToDoActor([]Item{})
+	api := &API{Actor: actor}
 
 	body := bytes.NewBufferString(`{"description":"Test task"}`)
-	req := httptest.NewRequest(http.MethodPost, "/create", body)
+	req := httptest.NewRequest(http.MethodPost, "/create", body).WithContext(testCtx())
 	w := httptest.NewRecorder()
 
 	api.Create(w, req)
@@ -31,10 +36,10 @@ func TestAPI_Create(t *testing.T) {
 }
 
 func TestAPI_Get(t *testing.T) {
-	items := []Item{{ID: 1, Description: "Task"}}
-	api := &API{Items: &items}
+	actor := NewToDoActor([]Item{{ID: 1, Description: "Task"}})
+	api := &API{Actor: actor}
 
-	req := httptest.NewRequest(http.MethodGet, "/get", nil)
+	req := httptest.NewRequest(http.MethodGet, "/get", nil).WithContext(testCtx())
 	w := httptest.NewRecorder()
 
 	api.Get(w, req)
@@ -52,11 +57,11 @@ func TestAPI_Get(t *testing.T) {
 }
 
 func TestAPI_Update(t *testing.T) {
-	items := []Item{{ID: 1, Description: "Old"}}
-	api := &API{Items: &items}
+	actor := NewToDoActor([]Item{{ID: 1, Description: "Old"}})
+	api := &API{Actor: actor}
 
 	body := bytes.NewBufferString(`{"id":1,"description":"New"}`)
-	req := httptest.NewRequest(http.MethodPost, "/update", body)
+	req := httptest.NewRequest(http.MethodPost, "/update", body).WithContext(testCtx())
 	w := httptest.NewRecorder()
 
 	api.Update(w, req)
@@ -64,17 +69,18 @@ func TestAPI_Update(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", w.Code)
 	}
-	if (*api.Items)[0].Description != "New" {
-		t.Errorf("expected updated description, got %s", (*api.Items)[0].Description)
+	items := actor.GetItems()
+	if items[0].Description != "New" {
+		t.Errorf("expected updated description, got %s", items[0].Description)
 	}
 }
 
 func TestAPI_Delete(t *testing.T) {
-	items := []Item{{ID: 1, Description: "ToDelete"}}
-	api := &API{Items: &items}
+	actor := NewToDoActor([]Item{{ID: 1, Description: "ToDelete"}})
+	api := &API{Actor: actor}
 
 	body := bytes.NewBufferString(`{"id":1}`)
-	req := httptest.NewRequest(http.MethodPost, "/delete", body)
+	req := httptest.NewRequest(http.MethodPost, "/delete", body).WithContext(testCtx())
 	w := httptest.NewRecorder()
 
 	api.Delete(w, req)
@@ -82,7 +88,8 @@ func TestAPI_Delete(t *testing.T) {
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("expected status 204, got %d", w.Code)
 	}
-	if len(*api.Items) != 0 {
+	items := actor.GetItems()
+	if len(items) != 0 {
 		t.Errorf("expected item to be deleted")
 	}
 }
