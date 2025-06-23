@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Create ToDo</title>
+</head>
+<body>
+    <h1>Create ToDo</h1>
+    <form id="createForm">
+        <input type="text" id="desc" placeholder="Description" required>
+        <button type="submit">Create</button>
+    </form>
+    <pre id="result"></pre>
+    <script>
+        document.getElementById('createForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const desc = document.getElementById('desc').value;
+            const res = await fetch('/create', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({description: desc})
+            });
+            document.getElementById('result').textContent = await res.text();
+        };
+    </script>
+</body>
+</html>

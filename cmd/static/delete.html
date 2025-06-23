@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Delete ToDo</title>
+</head>
+<body>
+    <h1>Delete ToDo</h1>
+    <form id="deleteForm">
+        <input type="number" id="id" placeholder="ID" required>
+        <button type="submit">Delete</button>
+    </form>
+    <pre id="result"></pre>
+    <script>
+        document.getElementById('deleteForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const id = parseInt(document.getElementById('id').value, 10);
+            const res = await fetch('/delete', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({id})
+            });
+            document.getElementById('result').textContent = res.ok ? "Deleted!" : await res.text();
+        };
+    </script>
+</body>
+</html>
